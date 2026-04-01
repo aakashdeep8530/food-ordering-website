@@ -4,7 +4,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 
-# Stage 2: Production image
+# Stage 2: Production images
 FROM node:18-alpine AS production
 WORKDIR /app
 COPY package*.json ./
