@@ -118,5 +118,5 @@ Start the Backend server
 
 ## Deployment
 
-The application is deployed on Render.
+The application is deployed-on Render.
 
