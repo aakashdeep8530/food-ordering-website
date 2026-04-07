@@ -110,7 +110,7 @@ pipeline {
                     Reports attached.
                 """,
                 to: "aakashdeep8530@gmail.com",
-                attachmentsPattern: '**/dependency-check-report.*,trivyfs.txt,frontend.txt,backend.txt,admin.txt'
+                attachmentsPattern: '**/dependency-check-report.*,trivyfs.txt,frontend-image.txt,backend-image.txt,admin-image.txt'
             )
         }
     }
