@@ -1,0 +1,117 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage('Git Checkout') {
+            steps {
+                git url: 'https://github.com/aakashdeep8530/food-ordering-website.git', branch: 'dev'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'sonarqube-scanner'
+
+                    withSonarQubeEnv('SonarQube-Server') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=food-ordering-app \
+                            -Dsonar.projectName="Food Ordering App" \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=**/dependency-check-report.*,**/trivyfs.txt
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('OWASP FS SCAN') {
+            steps {
+                dependencyCheck(
+                    additionalArguments: '--scan ./ --format XML --disableYarnAudit --disableNodeAudit',
+                    odcInstallation: 'OWASP'
+                )
+            }
+        }
+
+        stage('TRIVY FS SCAN') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 10, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline failed: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh """
+                    docker build -t backend:1.0.${BUILD_NUMBER} ${WORKSPACE}/backend
+                    docker build -t frontend:1.0.${BUILD_NUMBER} ${WORKSPACE}/frontend
+                    docker build -t admin:1.0.${BUILD_NUMBER} ${WORKSPACE}/admin
+                    docker image prune -f
+                    docker images
+                """
+            }
+        }
+
+        stage('TRIVY DOCKER IMAGES SCAN') {
+            steps {
+                sh """
+                    trivy image frontend:1.0.${BUILD_NUMBER} > frontend.txt
+                    trivy image admin:1.0.${BUILD_NUMBER} > admin.txt
+                    trivy image backend:1.0.${BUILD_NUMBER} > backend.txt
+                """
+            }
+        }
+
+        stage("Docker Push") {
+            steps {
+                script {
+                    def images = ["frontend", "backend", "admin"]
+                    def repo = "aakashdeep8530"
+                    withDockerRegistry([credentialsId: 'dockerhub']) {
+                        for (img in images) {
+                            sh "docker tag ${img}:1.0.${BUILD_NUMBER} ${repo}/${img}:1.0.${BUILD_NUMBER}"
+                            sh "docker push ${repo}/${img}:1.0.${BUILD_NUMBER}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            emailext(
+                subject: "Jenkins Build: ${currentBuild.currentResult}",
+                body: """
+                    Build Status: ${currentBuild.currentResult}
+                    Job: ${env.JOB_NAME}
+                    Build Number: ${env.BUILD_NUMBER}
+                    Reports attached.
+                """,
+                to: "aakashdeep8530@gmail.com",
+                attachmentsPattern: '**/dependency-check-report.*,trivyfs.txt,frontend.txt,backend.txt,admin.txt'
+            )
+        }
+    }
+}
