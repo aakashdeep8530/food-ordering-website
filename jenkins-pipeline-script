@@ -76,9 +76,9 @@ pipeline {
         stage('TRIVY DOCKER IMAGES SCAN') {
             steps {
                 sh """
-                    trivy image frontend:1.0.${BUILD_NUMBER} > frontend.txt
-                    trivy image admin:1.0.${BUILD_NUMBER} > admin.txt
-                    trivy image backend:1.0.${BUILD_NUMBER} > backend.txt
+                    trivy image frontend:1.0.${BUILD_NUMBER} > frontend-image.txt
+                    trivy image admin:1.0.${BUILD_NUMBER} > admin-image.txt
+                    trivy image backend:1.0.${BUILD_NUMBER} > backend-image.txt
                 """
             }
         }
@@ -108,7 +108,7 @@ pipeline {
                     Job: ${env.JOB_NAME}
                     Build Number: ${env.BUILD_NUMBER}
                     Reports attached.
-                """,
+                    """,
                 to: "aakashdeep8530@gmail.com",
                 attachmentsPattern: '**/dependency-check-report.*,trivyfs.txt,frontend-image.txt,backend-image.txt,admin-image.txt'
             )
